@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PainelCotacao from "@/components/PainelCotacao";
 
 const ABAS = ["Soja", "Milho", "Boi Gordo"] as const;
 type Aba = (typeof ABAS)[number];
@@ -36,7 +37,11 @@ export default function Home() {
       </nav>
 
       <main className="mt-4 flex flex-1 items-center justify-center border border-border p-8">
-        <p className="text-muted">[{abaAtiva}] — dados em breve</p>
+        {abaAtiva === "Soja" ? (
+          <PainelCotacao produto="soja" />
+        ) : (
+          <p className="text-muted">[{abaAtiva}] — dados em breve</p>
+        )}
       </main>
     </div>
   );
