@@ -1,5 +1,9 @@
 import { NextRequest } from "next/server";
 
+// Roda a função na região de São Paulo: o CEPEA bloqueia requisições vindas
+// de datacenters estrangeiros (403)
+export const preferredRegion = "gru1";
+
 // Indicadores CEPEA/ESALQ. O id é o mesmo usado pelo widget oficial de
 // cotações do CEPEA (https://www.cepea.org.br/br/widget.aspx).
 // Semana 2: adicionar milho e boi gordo é acrescentar uma linha aqui.
@@ -40,9 +44,12 @@ export async function GET(
       `https://www.cepea.org.br/br/widgetproduto.js.php?id_indicador%5B%5D=${indicador.id}`,
       {
         headers: {
-          // O CEPEA recusa requisições sem identificação de navegador (403)
+          // O CEPEA recusa requisições que não parecem vir de um navegador (403)
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+          Accept: "*/*",
+          "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+          Referer: "https://www.cepea.org.br/br/widget.aspx",
         },
         next: { revalidate: 3600 },
       }
