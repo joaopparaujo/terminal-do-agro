@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { GoogleGenAI, Type } from "@google/genai";
 import Parser from "rss-parser";
 import { z } from "zod";
 
@@ -33,7 +32,10 @@ export interface Noticia {
   etiqueta: Etiqueta;
 }
 
-// Schema do que pedimos à IA — a API garante JSON exatamente neste formato
+// Modelo do nível gratuito da API do Gemini; ajustável sem mexer no código
+const MODELO_IA = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+
+// Validação do que a IA devolve — se vier fora do formato, cai no plano B
 const AnaliseSchema = z.object({
   analises: z.array(
     z.object({
@@ -95,7 +97,7 @@ function etiquetaPorPalavraChave(titulo: string): Etiqueta {
 }
 
 async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
-  const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
+  const ia = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const entrada = itens.map((n, id) => ({
     id,
@@ -103,22 +105,45 @@ async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
     descricao: n.descricao,
   }));
 
-  const resposta = await client.messages.parse({
-    model: "claude-haiku-4-5",
-    max_tokens: 8192,
-    system:
-      "Você é o editor de um terminal de mercado do agronegócio brasileiro. " +
-      "Para cada notícia recebida: (1) escreva um resumo objetivo de 1 a 2 frases " +
-      "em português, focado no que importa para quem acompanha preços; " +
-      "(2) classifique com a etiqueta 'soja', 'milho' ou 'boi' quando a notícia " +
-      "for principalmente sobre essa commodity, ou 'geral' caso contrário.",
-    messages: [{ role: "user", content: JSON.stringify(entrada) }],
-    output_config: { format: zodOutputFormat(AnaliseSchema) },
+  const resposta = await ia.models.generateContent({
+    model: MODELO_IA,
+    contents: JSON.stringify(entrada),
+    config: {
+      systemInstruction:
+        "Você é o editor de um terminal de mercado do agronegócio brasileiro. " +
+        "Para cada notícia recebida: (1) escreva um resumo objetivo de 1 a 2 frases " +
+        "em português, focado no que importa para quem acompanha preços; " +
+        "(2) classifique com a etiqueta 'soja', 'milho' ou 'boi' quando a notícia " +
+        "for principalmente sobre essa commodity, ou 'geral' caso contrário.",
+      responseMimeType: "application/json",
+      // Schema que a API do Gemini força na resposta
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          analises: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.INTEGER },
+                resumo: { type: Type.STRING },
+                etiqueta: {
+                  type: Type.STRING,
+                  enum: ["soja", "milho", "boi", "geral"],
+                },
+              },
+              required: ["id", "resumo", "etiqueta"],
+            },
+          },
+        },
+        required: ["analises"],
+      },
+    },
   });
 
-  const analises = new Map(
-    (resposta.parsed_output?.analises ?? []).map((a) => [a.id, a])
-  );
+  // Valida o JSON devolvido; se estiver fora do formato, lança e cai no plano B
+  const dados = AnaliseSchema.parse(JSON.parse(resposta.text ?? ""));
+  const analises = new Map(dados.analises.map((a) => [a.id, a]));
 
   return itens.map((n, id) => {
     const analise = analises.get(id);
@@ -139,7 +164,7 @@ export async function GET() {
   let noticias: Noticia[] | null = null;
   let ia = false;
 
-  if (process.env.ANTHROPIC_API_KEY && itens.length > 0) {
+  if (process.env.GEMINI_API_KEY && itens.length > 0) {
     try {
       noticias = await analisarComIA(itens);
       ia = true;
