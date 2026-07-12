@@ -156,24 +156,36 @@ function Variacao({ variacao }: { variacao: number }) {
   );
 }
 
-// A manchete que ajuda a explicar o movimento do dia: preferimos a notícia
-// da commodity cujo impacto previsto pela IA combina com a direção da
-// variação; senão, a mais recente da commodity
+type TipoRelacionada = "explica-movimento" | "commodity-recente" | "macro";
+
+// A manchete do dia, em três níveis de preferência: (1) notícia da commodity
+// cujo impacto previsto pela IA combina com a direção da variação;
+// (2) a mais recente da commodity; (3) a mais recente do cenário macro
 function escolherRelacionada(
   noticias: Noticia[],
   produto: string,
   variacao: number | undefined
-): { noticia: Noticia; explicaMovimento: boolean } | null {
+): { noticia: Noticia; tipo: TipoRelacionada } | null {
   const doProduto = noticias.filter((n) => n.etiqueta === produto);
-  if (doProduto.length === 0) return null;
 
-  if (variacao) {
+  if (variacao && doProduto.length > 0) {
     const direcao = variacao > 0 ? "alta" : "baixa";
     const combinando = doProduto.find((n) => n.impacto === direcao);
-    if (combinando) return { noticia: combinando, explicaMovimento: true };
+    if (combinando)
+      return { noticia: combinando, tipo: "explica-movimento" };
   }
-  return { noticia: doProduto[0], explicaMovimento: false };
+  if (doProduto.length > 0)
+    return { noticia: doProduto[0], tipo: "commodity-recente" };
+
+  const macro = noticias.find((n) => n.etiqueta === "geral");
+  return macro ? { noticia: macro, tipo: "macro" } : null;
 }
+
+const ROTULO_RELACIONADA: Record<TipoRelacionada, string> = {
+  "explica-movimento": "📰 Manchete que ajuda a explicar o movimento",
+  "commodity-recente": "📰 Notícia recente sobre a commodity",
+  macro: "📰 Cenário macro do dia",
+};
 
 export default function PainelCotacao({ produto }: { produto: string }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
@@ -299,9 +311,7 @@ export default function PainelCotacao({ produto }: { produto: string }) {
       {relacionada && (
         <div className="mt-6 border border-border p-3 text-left">
           <p className="mb-1 text-xs uppercase tracking-wider text-muted">
-            {relacionada.explicaMovimento
-              ? "📰 Manchete que ajuda a explicar o movimento"
-              : "📰 Notícia recente sobre a commodity"}
+            {ROTULO_RELACIONADA[relacionada.tipo]}
           </p>
           <a
             href={relacionada.noticia.link}
