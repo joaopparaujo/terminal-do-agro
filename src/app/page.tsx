@@ -21,7 +21,7 @@ export default function Home() {
     <div className="flex flex-1 flex-col p-4 sm:p-8">
       <header className="border border-border p-4">
         <h1 className="text-2xl font-bold tracking-widest uppercase">
-          Terminal do Agro
+          Terminal do Agro<span className="cursor-terminal">▮</span>
         </h1>
         <p className="mt-1 text-sm text-muted">
           Soja · Milho · Boi Gordo — preços, histórico e notícias
@@ -53,6 +53,34 @@ export default function Home() {
           <PainelCotacao produto={PRODUTO_DA_ABA[abaAtiva]!} />
         )}
       </main>
+
+      <footer className="mt-4 border border-border p-3 text-center text-xs text-muted">
+        <p>
+          Dados:{" "}
+          <a
+            href="https://www.cepea.org.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            CEPEA/ESALQ
+          </a>{" "}
+          — licença CC BY-NC 4.0 · Pregões recentes via Notícias Agrícolas
+        </p>
+        <p className="mt-1">
+          Notícias: Canal Rural, Money Times e G1 Agronegócios · Resumos e
+          etiquetas por IA (Gemini) · Projeto educacional — não é recomendação
+          de investimento ·{" "}
+          <a
+            href="https://github.com/joaopparaujo/terminal-do-agro"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            código-fonte
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

@@ -34,7 +34,7 @@ body {
 }
 
 .ticker {
-  animation: ticker 60s linear infinite;
+  animation: ticker 75s linear infinite;
 }
 
 .ticker:hover {
@@ -45,4 +45,18 @@ body {
   .ticker {
     animation: none;
   }
+  .cursor-terminal {
+    animation: none;
+  }
+}
+
+/* Cursor de terminal piscando no título */
+@keyframes piscar {
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-terminal {
+  animation: piscar 1.2s steps(1) infinite;
 }
