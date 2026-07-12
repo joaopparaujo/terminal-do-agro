@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
 
-// Roda a função na região de São Paulo: o CEPEA bloqueia requisições vindas
-// de datacenters estrangeiros (403)
-export const preferredRegion = "gru1";
-
 // Indicadores CEPEA/ESALQ. O id é o mesmo usado pelo widget oficial de
 // cotações do CEPEA (https://www.cepea.org.br/br/widget.aspx).
 // Semana 2: adicionar milho e boi gordo é acrescentar uma linha aqui.
