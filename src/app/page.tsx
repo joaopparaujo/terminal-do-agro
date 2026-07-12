@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import PainelCotacao from "@/components/PainelCotacao";
+import PainelNoticias from "@/components/PainelNoticias";
 
-const ABAS = ["Soja", "Milho", "Boi Gordo"] as const;
+const ABAS = ["Soja", "Milho", "Boi Gordo", "Notícias"] as const;
 type Aba = (typeof ABAS)[number];
 
-const PRODUTO_DA_ABA: Record<Aba, string> = {
+const PRODUTO_DA_ABA: Partial<Record<Aba, string>> = {
   Soja: "soja",
   Milho: "milho",
   "Boi Gordo": "boi",
@@ -43,7 +44,11 @@ export default function Home() {
       </nav>
 
       <main className="mt-4 flex flex-1 items-center justify-center border border-border p-8">
-        <PainelCotacao produto={PRODUTO_DA_ABA[abaAtiva]} />
+        {abaAtiva === "Notícias" ? (
+          <PainelNoticias />
+        ) : (
+          <PainelCotacao produto={PRODUTO_DA_ABA[abaAtiva]!} />
+        )}
       </main>
     </div>
   );
