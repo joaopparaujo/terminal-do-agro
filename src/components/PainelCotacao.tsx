@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import GraficoPrecos from "@/components/GraficoPrecos";
 import type { Pregao } from "@/app/api/historico/[produto]/route";
+import type { Noticia } from "@/app/api/noticias/route";
 
 interface Cotacao {
   produto: string;
@@ -155,9 +156,29 @@ function Variacao({ variacao }: { variacao: number }) {
   );
 }
 
+// A manchete que ajuda a explicar o movimento do dia: preferimos a notícia
+// da commodity cujo impacto previsto pela IA combina com a direção da
+// variação; senão, a mais recente da commodity
+function escolherRelacionada(
+  noticias: Noticia[],
+  produto: string,
+  variacao: number | undefined
+): { noticia: Noticia; explicaMovimento: boolean } | null {
+  const doProduto = noticias.filter((n) => n.etiqueta === produto);
+  if (doProduto.length === 0) return null;
+
+  if (variacao) {
+    const direcao = variacao > 0 ? "alta" : "baixa";
+    const combinando = doProduto.find((n) => n.impacto === direcao);
+    if (combinando) return { noticia: combinando, explicaMovimento: true };
+  }
+  return { noticia: doProduto[0], explicaMovimento: false };
+}
+
 export default function PainelCotacao({ produto }: { produto: string }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
   const [pregoes, setPregoes] = useState<Pregao[] | null>(null);
+  const [noticias, setNoticias] = useState<Noticia[] | null>(null);
   const [periodo, setPeriodo] = useState<Periodo>("1A");
 
   useEffect(() => {
@@ -171,6 +192,16 @@ export default function PainelCotacao({ produto }: { produto: string }) {
       })
       .catch(() => {
         if (ativo) setEstado({ fase: "erro" });
+      });
+
+    // Notícias para a manchete relacionada; se falhar, o painel segue sem ela
+    fetch("/api/noticias")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((dados: { noticias: Noticia[] } | null) => {
+        if (ativo) setNoticias(dados?.noticias ?? null);
+      })
+      .catch(() => {
+        if (ativo) setNoticias(null);
       });
 
     // Histórico é camada extra: se falhar, o painel segue só com o preço
@@ -206,6 +237,9 @@ export default function PainelCotacao({ produto }: { produto: string }) {
   const { cotacao } = estado;
   const detalhes = DETALHES[produto];
   const ultimoPregao = pregoes?.[pregoes.length - 1];
+  const relacionada = noticias
+    ? escolherRelacionada(noticias, produto, ultimoPregao?.variacao)
+    : null;
   const pregoesDoPeriodo = pregoes
     ? podarPontos(
         filtrarPeriodo(
@@ -260,6 +294,28 @@ export default function PainelCotacao({ produto }: { produto: string }) {
             </div>
           </div>
           <GraficoPrecos pregoes={pregoesDoPeriodo} />
+        </div>
+      )}
+      {relacionada && (
+        <div className="mt-6 border border-border p-3 text-left">
+          <p className="mb-1 text-xs uppercase tracking-wider text-muted">
+            {relacionada.explicaMovimento
+              ? "📰 Manchete que ajuda a explicar o movimento"
+              : "📰 Notícia recente sobre a commodity"}
+          </p>
+          <a
+            href={relacionada.noticia.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold hover:underline"
+          >
+            {relacionada.noticia.titulo}
+          </a>
+          {relacionada.noticia.resumo && (
+            <p className="mt-1 text-sm text-muted">
+              {relacionada.noticia.resumo}
+            </p>
+          )}
         </div>
       )}
       <p className="mt-6 text-sm text-muted">

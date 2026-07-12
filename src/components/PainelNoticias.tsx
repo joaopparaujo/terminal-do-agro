@@ -13,7 +13,7 @@ const FILTROS: { rotulo: string; valor: Etiqueta | "todas" }[] = [
   { rotulo: "Soja", valor: "soja" },
   { rotulo: "Milho", valor: "milho" },
   { rotulo: "Boi", valor: "boi" },
-  { rotulo: "Geral", valor: "geral" },
+  { rotulo: "Macro", valor: "geral" },
 ];
 
 const COR_ETIQUETA: Record<Etiqueta, string> = {
@@ -107,7 +107,7 @@ export default function PainelNoticias() {
               <span
                 className={`border px-1.5 py-0.5 uppercase ${COR_ETIQUETA[noticia.etiqueta]}`}
               >
-                {noticia.etiqueta}
+                {noticia.etiqueta === "geral" ? "macro" : noticia.etiqueta}
               </span>
               <span className="text-muted">
                 {noticia.fonte} · {formatarData(noticia.data)}

@@ -26,7 +26,10 @@ export interface Noticia {
   fonte: string;
   resumo: string | null; // null quando a IA não está disponível
   etiqueta: Etiqueta;
+  impacto: Impacto | null; // direção provável do efeito sobre o preço
 }
+
+export type Impacto = "alta" | "baixa" | "neutro";
 
 // Modelo do nível gratuito da API do Gemini; ajustável sem mexer no código
 const MODELO_IA = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
@@ -38,6 +41,8 @@ const AnaliseSchema = z.object({
       id: z.number(),
       resumo: z.string(),
       etiqueta: z.enum(["soja", "milho", "boi", "geral"]),
+      relevante: z.boolean(),
+      impacto: z.enum(["alta", "baixa", "neutro"]),
     })
   ),
 });
@@ -106,11 +111,18 @@ async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
     contents: JSON.stringify(entrada),
     config: {
       systemInstruction:
-        "Você é o editor de um terminal de mercado do agronegócio brasileiro. " +
-        "Para cada notícia recebida: (1) escreva um resumo objetivo de 1 a 2 frases " +
-        "em português, focado no que importa para quem acompanha preços; " +
-        "(2) classifique com a etiqueta 'soja', 'milho' ou 'boi' quando a notícia " +
-        "for principalmente sobre essa commodity, ou 'geral' caso contrário.",
+        "Você é o editor de um terminal de mercado do agronegócio brasileiro, " +
+        "focado nos preços de soja, milho e boi gordo. Para cada notícia: " +
+        "(1) resumo objetivo de 1 a 2 frases em português, focado no que importa " +
+        "para quem acompanha preços; " +
+        "(2) etiqueta: 'soja', 'milho' ou 'boi' se for principalmente sobre essa " +
+        "commodity; 'geral' para o cenário macro do agro (câmbio, clima, política " +
+        "agrícola, exportações, logística, crédito rural); " +
+        "(3) relevante: true se a notícia afeta ou contextualiza preços de " +
+        "commodities ou o cenário macro do agronegócio; false para curiosidades, " +
+        "receitas, turismo rural, fauna e temas sem efeito sobre o mercado; " +
+        "(4) impacto: direção provável do efeito sobre o preço da commodity " +
+        "etiquetada ('alta', 'baixa' ou 'neutro' se incerto/sem direção).",
       responseMimeType: "application/json",
       // Schema que a API do Gemini força na resposta
       responseSchema: {
@@ -127,8 +139,13 @@ async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
                   type: Type.STRING,
                   enum: ["soja", "milho", "boi", "geral"],
                 },
+                relevante: { type: Type.BOOLEAN },
+                impacto: {
+                  type: Type.STRING,
+                  enum: ["alta", "baixa", "neutro"],
+                },
               },
-              required: ["id", "resumo", "etiqueta"],
+              required: ["id", "resumo", "etiqueta", "relevante", "impacto"],
             },
           },
         },
@@ -141,17 +158,19 @@ async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
   const dados = AnaliseSchema.parse(JSON.parse(resposta.text ?? ""));
   const analises = new Map(dados.analises.map((a) => [a.id, a]));
 
-  return itens.map((n, id) => {
-    const analise = analises.get(id);
-    return {
+  return itens
+    .map((n, id) => ({ n, analise: analises.get(id) }))
+    // Fora curiosidades/receitas/etc.: só o que afeta mercado ou macro do agro
+    .filter(({ analise }) => analise?.relevante !== false)
+    .map(({ n, analise }) => ({
       titulo: n.titulo,
       link: n.link,
       data: n.data,
       fonte: n.fonte,
       resumo: analise?.resumo ?? null,
       etiqueta: analise?.etiqueta ?? etiquetaPorPalavraChave(n.titulo),
-    };
-  });
+      impacto: analise?.impacto ?? null,
+    }));
 }
 
 // Cache em tempo de execução (não no build, onde a chave da IA não existe):
@@ -181,11 +200,12 @@ const noticiasCacheadas = unstable_cache(
       fonte: n.fonte,
       resumo: null,
       etiqueta: etiquetaPorPalavraChave(n.titulo),
+      impacto: null,
     }));
 
     return { noticias, ia, geradoEm: new Date().toISOString() };
   },
-  ["noticias-v3"],
+  ["noticias-v4"],
   { revalidate: 1800 }
 );
 
