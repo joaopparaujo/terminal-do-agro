@@ -6,6 +6,12 @@ import PainelCotacao from "@/components/PainelCotacao";
 const ABAS = ["Soja", "Milho", "Boi Gordo"] as const;
 type Aba = (typeof ABAS)[number];
 
+const PRODUTO_DA_ABA: Record<Aba, string> = {
+  Soja: "soja",
+  Milho: "milho",
+  "Boi Gordo": "boi",
+};
+
 export default function Home() {
   const [abaAtiva, setAbaAtiva] = useState<Aba>("Soja");
 
@@ -37,11 +43,7 @@ export default function Home() {
       </nav>
 
       <main className="mt-4 flex flex-1 items-center justify-center border border-border p-8">
-        {abaAtiva === "Soja" ? (
-          <PainelCotacao produto="soja" />
-        ) : (
-          <p className="text-muted">[{abaAtiva}] — dados em breve</p>
-        )}
+        <PainelCotacao produto={PRODUTO_DA_ABA[abaAtiva]} />
       </main>
     </div>
   );

@@ -5,6 +5,8 @@ import { NextRequest } from "next/server";
 // Semana 2: adicionar milho e boi gordo é acrescentar uma linha aqui.
 const INDICADORES = {
   soja: { id: 92, nome: "Indicador da Soja CEPEA/ESALQ - Paranaguá" },
+  milho: { id: 77, nome: "Indicador do Milho ESALQ/B3" },
+  boi: { id: 2, nome: "Indicador do Boi Gordo CEPEA/B3" },
 } as const;
 
 type Produto = keyof typeof INDICADORES;

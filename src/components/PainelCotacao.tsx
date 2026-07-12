@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import GraficoPrecos from "@/components/GraficoPrecos";
+import type { Pregao } from "@/app/api/historico/[produto]/route";
 
 interface Cotacao {
   produto: string;
@@ -20,6 +22,8 @@ type Estado =
 // Mesmos ids de indicador usados pela API Route (widget oficial do CEPEA)
 const IDS_WIDGET: Record<string, number> = {
   soja: 92,
+  milho: 77,
+  boi: 2,
 };
 
 // Plano B: o servidor do Vercel é bloqueado pelo CEPEA (403 para IPs de
@@ -83,12 +87,30 @@ async function buscarCotacao(produto: string): Promise<Cotacao> {
   }
 }
 
+function Variacao({ variacao }: { variacao: number }) {
+  const sinal = variacao > 0 ? "▲" : variacao < 0 ? "▼" : "▪";
+  const cor =
+    variacao > 0
+      ? "text-green-400"
+      : variacao < 0
+        ? "text-red-400"
+        : "text-muted";
+  return (
+    <span className={cor}>
+      {sinal} {variacao > 0 ? "+" : ""}
+      {variacao.toLocaleString("pt-BR")}%
+    </span>
+  );
+}
+
 export default function PainelCotacao({ produto }: { produto: string }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
+  const [pregoes, setPregoes] = useState<Pregao[] | null>(null);
 
   useEffect(() => {
     let ativo = true;
     setEstado({ fase: "carregando" });
+    setPregoes(null);
 
     buscarCotacao(produto)
       .then((cotacao) => {
@@ -96,6 +118,19 @@ export default function PainelCotacao({ produto }: { produto: string }) {
       })
       .catch(() => {
         if (ativo) setEstado({ fase: "erro" });
+      });
+
+    // Histórico é camada extra: se falhar, o painel segue só com o preço
+    fetch(`/api/historico/${produto}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        return res.json();
+      })
+      .then((historico: { pregoes: Pregao[] }) => {
+        if (ativo) setPregoes(historico.pregoes);
+      })
+      .catch(() => {
+        if (ativo) setPregoes(null);
       });
 
     return () => {
@@ -116,16 +151,33 @@ export default function PainelCotacao({ produto }: { produto: string }) {
   }
 
   const { cotacao } = estado;
+  const ultimoPregao = pregoes?.[pregoes.length - 1];
 
   return (
-    <div className="text-center">
+    <div className="w-full max-w-2xl text-center">
       <p className="text-sm uppercase tracking-wider text-muted">
         {cotacao.indicador}
       </p>
       <p className="mt-4 text-5xl font-bold sm:text-6xl">
         {cotacao.valorFormatado}
       </p>
-      <p className="mt-2 text-muted">{cotacao.unidade}</p>
+      <p className="mt-2 text-muted">
+        {cotacao.unidade}
+        {ultimoPregao && (
+          <>
+            {" · "}
+            <Variacao variacao={ultimoPregao.variacao} />
+          </>
+        )}
+      </p>
+      {pregoes && (
+        <div className="mt-8">
+          <p className="mb-2 text-left text-xs uppercase tracking-wider text-muted">
+            Últimos {pregoes.length} pregões
+          </p>
+          <GraficoPrecos pregoes={pregoes} />
+        </div>
+      )}
       <p className="mt-6 text-sm text-muted">
         Referência: {cotacao.data} · Fonte: {cotacao.fonte} ({cotacao.licenca})
       </p>
