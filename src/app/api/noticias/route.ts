@@ -1,11 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { unstable_cache } from "next/cache";
 import Parser from "rss-parser";
 import { z } from "zod";
-
-// Resposta inteira cacheada por 30 min: a IA roda no máximo 2x por hora,
-// independente de quantos visitantes abrirem a aba
-export const dynamic = "force-static";
-export const revalidate = 1800;
 
 const FEEDS = [
   { fonte: "Canal Rural", url: "https://www.canalrural.com.br/feed/" },
@@ -158,35 +154,41 @@ async function analisarComIA(itens: ItemBruto[]): Promise<Noticia[]> {
   });
 }
 
-export async function GET() {
-  const itens = await coletarFeeds();
+// Cache em tempo de execução (não no build, onde a chave da IA não existe):
+// a coleta + IA rodam no máximo a cada 30 min, independente de visitas
+const noticiasCacheadas = unstable_cache(
+  async () => {
+    const itens = await coletarFeeds();
 
-  let noticias: Noticia[] | null = null;
-  let ia = false;
+    let noticias: Noticia[] | null = null;
+    let ia = false;
 
-  if (process.env.GEMINI_API_KEY && itens.length > 0) {
-    try {
-      noticias = await analisarComIA(itens);
-      ia = true;
-    } catch (erro) {
-      console.error("Falha na análise por IA; usando plano B:", erro);
+    if (process.env.GEMINI_API_KEY && itens.length > 0) {
+      try {
+        noticias = await analisarComIA(itens);
+        ia = true;
+      } catch (erro) {
+        console.error("Falha na análise por IA; usando plano B:", erro);
+      }
     }
-  }
 
-  // Sem chave ou com falha na IA: notícias saem sem resumo, com etiqueta
-  // por palavra-chave — a aba continua útil
-  noticias ??= itens.map((n) => ({
-    titulo: n.titulo,
-    link: n.link,
-    data: n.data,
-    fonte: n.fonte,
-    resumo: null,
-    etiqueta: etiquetaPorPalavraChave(n.titulo),
-  }));
+    // Sem chave ou com falha na IA: notícias saem sem resumo, com etiqueta
+    // por palavra-chave — a aba continua útil
+    noticias ??= itens.map((n) => ({
+      titulo: n.titulo,
+      link: n.link,
+      data: n.data,
+      fonte: n.fonte,
+      resumo: null,
+      etiqueta: etiquetaPorPalavraChave(n.titulo),
+    }));
 
-  return Response.json({
-    noticias,
-    ia,
-    geradoEm: new Date().toISOString(),
-  });
+    return { noticias, ia, geradoEm: new Date().toISOString() };
+  },
+  ["noticias"],
+  { revalidate: 1800 }
+);
+
+export async function GET() {
+  return Response.json(await noticiasCacheadas());
 }
