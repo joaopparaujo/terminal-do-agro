@@ -1,0 +1,37 @@
+name: Atualiza histórico de preços
+
+on:
+  schedule:
+    # 22:30 UTC = 19:30 em Brasília, dias úteis (CEPEA fecha o indicador
+    # no fim da tarde)
+    - cron: "30 22 * * 1-5"
+  # Permite disparar manualmente na aba Actions do GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Buscar pregões novos
+        run: node scripts/atualiza-historico.mjs
+
+      - name: Commit e push se houver mudança
+        run: |
+          if git diff --quiet; then
+            echo "Nada novo hoje — nenhum commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/data/historico
+            git commit -m "Atualiza histórico de preços (automático)"
+            git push
+          fi
