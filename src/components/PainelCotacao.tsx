@@ -19,7 +19,59 @@ type Estado =
   | { fase: "erro" }
   | { fase: "ok"; cotacao: Cotacao };
 
-// Mesmos ids de indicador usados pela API Route (widget oficial do CEPEA)
+// Qual indicador CEPEA exatamente cada aba mostra — há indicadores
+// parecidos (ex.: Soja Paranaguá vs. Soja Paraná), então seja explícito
+const DETALHES: Record<string, { titulo: string; detalhe: string }> = {
+  soja: {
+    titulo: "Indicador da Soja CEPEA/ESALQ — Paranaguá",
+    detalhe:
+      "Saca de 60 kg no porto de Paranaguá-PR (referência de exportação; difere do indicador Paraná, média do estado)",
+  },
+  milho: {
+    titulo: "Indicador do Milho ESALQ/B3",
+    detalhe: "Saca de 60 kg, à vista, região de Campinas-SP",
+  },
+  boi: {
+    titulo: "Indicador do Boi Gordo CEPEA/B3",
+    detalhe:
+      "Arroba (15 kg), Estado de São Paulo — base dos contratos futuros da B3",
+  },
+};
+
+const PERIODOS = [
+  { rotulo: "1S", dias: 7 },
+  { rotulo: "1M", dias: 30 },
+  { rotulo: "6M", dias: 183 },
+  { rotulo: "1A", dias: 365 },
+  { rotulo: "2A", dias: 730 },
+  { rotulo: "5A", dias: 1826 },
+  { rotulo: "MAX", dias: Infinity },
+] as const;
+
+type Periodo = (typeof PERIODOS)[number]["rotulo"];
+
+const MAX_PONTOS_NO_GRAFICO = 380;
+
+function filtrarPeriodo(pregoes: Pregao[], dias: number): Pregao[] {
+  if (!Number.isFinite(dias)) return pregoes;
+  const corte = new Date(Date.now() - dias * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  return pregoes.filter((p) => p.data >= corte);
+}
+
+// Para janelas longas, desenhar todos os pregões deixa o gráfico pesado sem
+// ganho visual; mantemos no máximo ~380 pontos, preservando o último
+function podarPontos(pregoes: Pregao[]): Pregao[] {
+  if (pregoes.length <= MAX_PONTOS_NO_GRAFICO) return pregoes;
+  const passo = Math.ceil(pregoes.length / MAX_PONTOS_NO_GRAFICO);
+  const podados = pregoes.filter((_, i) => i % passo === 0);
+  if (podados[podados.length - 1] !== pregoes[pregoes.length - 1]) {
+    podados.push(pregoes[pregoes.length - 1]);
+  }
+  return podados;
+}
+
 const IDS_WIDGET: Record<string, number> = {
   soja: 92,
   milho: 77,
@@ -106,6 +158,7 @@ function Variacao({ variacao }: { variacao: number }) {
 export default function PainelCotacao({ produto }: { produto: string }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
   const [pregoes, setPregoes] = useState<Pregao[] | null>(null);
+  const [periodo, setPeriodo] = useState<Periodo>("1A");
 
   useEffect(() => {
     let ativo = true;
@@ -151,12 +204,21 @@ export default function PainelCotacao({ produto }: { produto: string }) {
   }
 
   const { cotacao } = estado;
+  const detalhes = DETALHES[produto];
   const ultimoPregao = pregoes?.[pregoes.length - 1];
+  const pregoesDoPeriodo = pregoes
+    ? podarPontos(
+        filtrarPeriodo(
+          pregoes,
+          PERIODOS.find((p) => p.rotulo === periodo)?.dias ?? Infinity
+        )
+      )
+    : null;
 
   return (
     <div className="w-full max-w-2xl text-center">
       <p className="text-sm uppercase tracking-wider text-muted">
-        {cotacao.indicador}
+        {detalhes?.titulo ?? cotacao.indicador}
       </p>
       <p className="mt-4 text-5xl font-bold sm:text-6xl">
         {cotacao.valorFormatado}
@@ -170,12 +232,34 @@ export default function PainelCotacao({ produto }: { produto: string }) {
           </>
         )}
       </p>
-      {pregoes && (
+      {detalhes && (
+        <p className="mx-auto mt-2 max-w-xl text-xs text-muted">
+          {detalhes.detalhe}
+        </p>
+      )}
+      {pregoesDoPeriodo && pregoesDoPeriodo.length > 1 && (
         <div className="mt-8">
-          <p className="mb-2 text-left text-xs uppercase tracking-wider text-muted">
-            Últimos {pregoes.length} pregões
-          </p>
-          <GraficoPrecos pregoes={pregoes} />
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wider text-muted">
+              Histórico
+            </p>
+            <div className="flex gap-1">
+              {PERIODOS.map(({ rotulo }) => (
+                <button
+                  key={rotulo}
+                  onClick={() => setPeriodo(rotulo)}
+                  className={`border border-border px-2 py-1 text-xs transition-colors ${
+                    periodo === rotulo
+                      ? "bg-foreground font-bold text-background"
+                      : "text-muted hover:bg-border"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+          </div>
+          <GraficoPrecos pregoes={pregoesDoPeriodo} />
         </div>
       )}
       <p className="mt-6 text-sm text-muted">
