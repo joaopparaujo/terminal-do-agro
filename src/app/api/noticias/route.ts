@@ -185,10 +185,18 @@ const noticiasCacheadas = unstable_cache(
 
     return { noticias, ia, geradoEm: new Date().toISOString() };
   },
-  ["noticias"],
+  ["noticias-v2"],
   { revalidate: 1800 }
 );
 
 export async function GET() {
-  return Response.json(await noticiasCacheadas());
+  const dados = await noticiasCacheadas();
+  return Response.json({
+    ...dados,
+    // debug temporário: a função enxerga a chave? (nunca expõe o valor)
+    debugChave: {
+      presente: Boolean(process.env.GEMINI_API_KEY),
+      comprimento: process.env.GEMINI_API_KEY?.length ?? 0,
+    },
+  });
 }
