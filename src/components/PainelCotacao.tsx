@@ -156,35 +156,43 @@ function Variacao({ variacao }: { variacao: number }) {
   );
 }
 
-type TipoRelacionada = "explica-movimento" | "commodity-recente" | "macro";
+type TipoRelacionada =
+  | "explica-movimento"
+  | "explica-macro"
+  | "commodity-recente";
 
-// A manchete do dia, em três níveis de preferência: (1) notícia da commodity
-// cujo impacto previsto pela IA combina com a direção da variação;
-// (2) a mais recente da commodity; (3) a mais recente do cenário macro
+// A manchete só aparece se explicar o movimento do dia (pela commodity ou
+// por fator macro com direção congruente) ou se tiver relação direta com
+// a commodity; caso contrário, nada é exibido
 function escolherRelacionada(
   noticias: Noticia[],
   produto: string,
   variacao: number | undefined
 ): { noticia: Noticia; tipo: TipoRelacionada } | null {
   const doProduto = noticias.filter((n) => n.etiqueta === produto);
+  const direcao = variacao ? (variacao > 0 ? "alta" : "baixa") : null;
 
-  if (variacao && doProduto.length > 0) {
-    const direcao = variacao > 0 ? "alta" : "baixa";
-    const combinando = doProduto.find((n) => n.impacto === direcao);
-    if (combinando)
-      return { noticia: combinando, tipo: "explica-movimento" };
+  if (direcao) {
+    const daCommodity = doProduto.find((n) => n.impacto === direcao);
+    if (daCommodity)
+      return { noticia: daCommodity, tipo: "explica-movimento" };
+
+    const macro = noticias.find(
+      (n) => n.etiqueta === "geral" && n.impacto === direcao
+    );
+    if (macro) return { noticia: macro, tipo: "explica-macro" };
   }
+
   if (doProduto.length > 0)
     return { noticia: doProduto[0], tipo: "commodity-recente" };
 
-  const macro = noticias.find((n) => n.etiqueta === "geral");
-  return macro ? { noticia: macro, tipo: "macro" } : null;
+  return null;
 }
 
 const ROTULO_RELACIONADA: Record<TipoRelacionada, string> = {
   "explica-movimento": "📰 Manchete que ajuda a explicar o movimento",
+  "explica-macro": "📰 Fator macro que ajuda a explicar o movimento",
   "commodity-recente": "📰 Notícia recente sobre a commodity",
-  macro: "📰 Cenário macro do dia",
 };
 
 export default function PainelCotacao({ produto }: { produto: string }) {

@@ -21,3 +21,28 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-mono), monospace;
 }
+
+/* Ticker de manchetes: a faixa (com conteúdo duplicado) anda meia largura
+   e recomeça, criando um loop contínuo */
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker {
+  animation: ticker 60s linear infinite;
+}
+
+.ticker:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker {
+    animation: none;
+  }
+}

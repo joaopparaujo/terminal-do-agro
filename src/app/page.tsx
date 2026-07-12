@@ -3,6 +3,7 @@
 import { useState } from "react";
 import PainelCotacao from "@/components/PainelCotacao";
 import PainelNoticias from "@/components/PainelNoticias";
+import TickerNoticias from "@/components/TickerNoticias";
 
 const ABAS = ["Soja", "Milho", "Boi Gordo", "Notícias"] as const;
 type Aba = (typeof ABAS)[number];
@@ -26,6 +27,8 @@ export default function Home() {
           Soja · Milho · Boi Gordo — preços, histórico e notícias
         </p>
       </header>
+
+      <TickerNoticias />
 
       <nav className="mt-4 flex gap-2">
         {ABAS.map((aba) => (
