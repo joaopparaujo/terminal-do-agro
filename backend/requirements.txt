@@ -1,0 +1,7 @@
+# Fase 0 — esqueleto. Tudo Python puro / com wheels prontos, instala limpo no 3.14.
+fastapi>=0.115
+uvicorn>=0.34
+pydantic-settings>=2.7
+
+# O driver do Postgres (asyncpg ou psycopg) + SQLAlchemy entram na etapa do
+# banco, junto com o schema — assim resolvemos a questão de wheel no 3.14 lá.
